@@ -1,0 +1,4 @@
+project_id = "iqwynkrzzhzqeoulflzi"
+
+[functions.mobile-payment]
+verify_jwt = true

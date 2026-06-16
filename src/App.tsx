@@ -17,6 +17,8 @@ import Support from "./pages/Support";
 import Profile from "./pages/Profile";
 import Bookings from "./pages/Bookings";
 import Operator from "./pages/Operator";
+import LostAndFound from "./pages/LostAndFound";
+import PeerDelivery from "./pages/PeerDelivery";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +38,8 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/routes" element={<RoutesPage />} />
+            <Route path="/lost-and-found" element={<LostAndFound />} />
+            <Route path="/peer-delivery" element={<PeerDelivery />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/support" element={<Support />} />

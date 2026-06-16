@@ -10,7 +10,7 @@ import BookingFlow from "@/components/BookingFlow";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Card, CardContent } from "@/components/ui/card";
-import { Ticket, MapPin, MessageCircle, Calendar, ArrowRight, Bell, FileText, Info } from "lucide-react";
+import { Ticket, MapPin, MessageCircle, Calendar, ArrowRight, Bell, FileText, Info, Heart, Package } from "lucide-react";
 import { useTranslations } from "@/hooks/useTranslations";
 import { formatDistanceToNow } from "date-fns";
 
@@ -169,26 +169,26 @@ const Index = () => {
       }
     },
     {
+      icon: Heart,
+      title: "Lost & Found",
+      subtitle: "Report or find items",
+      color: "bg-green-500",
+      onClick: () => navigate("/lost-and-found")
+    },
+    {
+      icon: Package,
+      title: "P2P Delivery",
+      subtitle: "Send packages",
+      color: "bg-cyan-500",
+      onClick: () => navigate("/peer-delivery")
+    },
+    {
       icon: Calendar,
       title: t('index.myBookings'),
       subtitle: t('index.viewBookings'),
-      color: "bg-green-500",
+      color: "bg-indigo-500",
       onClick: () => navigate("/bookings"),
       requiresAuth: true
-    },
-    {
-      icon: MapPin,
-      title: t('index.viewRoutes'),
-      subtitle: t('index.exploreRoutes'),
-      color: "bg-purple-500",
-      onClick: () => navigate("/routes")
-    },
-    {
-      icon: MessageCircle,
-      title: t('index.contactSupport'),
-      subtitle: t('index.getHelp'),
-      color: "bg-orange-500",
-      onClick: () => navigate("/contact")
     }
   ];
 

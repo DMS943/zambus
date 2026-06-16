@@ -1,7 +1,7 @@
 
-import { Bus, User, LogOut, Languages } from "lucide-react";
+import { Bus, User, LogOut, Languages, Heart, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTranslations } from "@/hooks/useTranslations";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -16,6 +16,7 @@ import {
 
 const Header = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout, updateLanguage, isAuthenticated, guestLanguage, updateGuestLanguage, loading } = useAuth();
   const { t, currentLanguage } = useTranslations();
   const { isAdminOrModerator, isOperator, loading: rolesLoading } = useUserRole();
@@ -38,9 +39,12 @@ const Header = () => {
     }
   };
 
+  const isActive = (path: string) => location.pathname === path;
+
   return (
     <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4">
+        {/* Main Header */}
         <div className="flex justify-between items-center h-14">
           <Link to="/" className="flex items-center space-x-2">
             <div className="african-gradient p-1.5 rounded-lg">
@@ -125,6 +129,45 @@ const Header = () => {
               </button>
             )}
           </div>
+        </div>
+
+        {/* Service Tabs */}
+        <div className="hidden md:flex items-center space-x-1 border-t border-gray-100 px-0 py-0">
+          <button
+            onClick={() => navigate("/")}
+            className={`flex items-center space-x-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+              isActive("/") 
+                ? "text-primary border-primary" 
+                : "text-gray-600 border-transparent hover:text-gray-900"
+            }`}
+          >
+            <Bus className="h-4 w-4" />
+            <span>Bus Tickets</span>
+          </button>
+          
+          <button
+            onClick={() => navigate("/lost-and-found")}
+            className={`flex items-center space-x-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+              isActive("/lost-and-found") 
+                ? "text-green-600 border-green-600" 
+                : "text-gray-600 border-transparent hover:text-gray-900"
+            }`}
+          >
+            <Heart className="h-4 w-4" />
+            <span>Lost & Found</span>
+          </button>
+          
+          <button
+            onClick={() => navigate("/peer-delivery")}
+            className={`flex items-center space-x-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+              isActive("/peer-delivery") 
+                ? "text-accent border-accent" 
+                : "text-gray-600 border-transparent hover:text-gray-900"
+            }`}
+          >
+            <Package className="h-4 w-4" />
+            <span>P2P Delivery</span>
+          </button>
         </div>
       </div>
     </header>

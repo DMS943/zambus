@@ -18,6 +18,7 @@ import Profile from "./pages/Profile";
 import Bookings from "./pages/Bookings";
 import Operator from "./pages/Operator";
 import LostAndFound from "./pages/LostAndFound";
+import PackageDelivery from "./pages/PackageDelivery";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/support" element={<Support />} />
             <Route path="/lost-and-found" element={<LostAndFound />} />
+            <Route path="/package-delivery" element={<PackageDelivery />} />
             
             {/* Protected routes requiring authentication */}
             <Route path="/profile" element={

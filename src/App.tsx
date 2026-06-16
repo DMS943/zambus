@@ -17,6 +17,7 @@ import Support from "./pages/Support";
 import Profile from "./pages/Profile";
 import Bookings from "./pages/Bookings";
 import Operator from "./pages/Operator";
+import LostAndFound from "./pages/LostAndFound";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +40,7 @@ const App = () => (
             <Route path="/contact" element={<Contact />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/support" element={<Support />} />
+            <Route path="/lost-and-found" element={<LostAndFound />} />
             
             {/* Protected routes requiring authentication */}
             <Route path="/profile" element={

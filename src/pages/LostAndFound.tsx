@@ -1,278 +1,329 @@
 import { useState } from "react";
-import { Heart, Plus, Search, Filter, AlertCircle } from "lucide-react";
+import { Search, Package, MapPin, Calendar, Phone, Mail, AlertCircle, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Header from "@/components/Header";
 import BottomNav from "@/components/BottomNav";
-import LostItemCard from "@/components/LostItemCard";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
-// Mock data - in production, this would come from Supabase
-const mockItems = [
-  {
-    id: "1",
-    title: "Blue Laptop Backpack",
-    description: "Blue North Face backpack with laptop compartment and rain cover",
-    category: "baggage",
-    imageUrl: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&h=300&fit=crop",
-    route: "Lusaka - Ndola",
-    postDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-    status: "lost" as const,
-    rewardAmount: 500,
-    contactInfo: "John +260 965 123456",
-  },
-  {
-    id: "2",
-    title: "iPhone 13 Pro",
-    description: "Space gray iPhone with case, found on bus ZM-2045",
-    category: "electronics",
-    imageUrl: "https://images.unsplash.com/photo-1592286927505-1def25115558?w=400&h=300&fit=crop",
-    route: "Kitwe - Livingstone",
-    postDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-    status: "found" as const,
-    contactInfo: "Sarah +260 977 654321",
-  },
-  {
-    id: "3",
-    title: "Brown Leather Wallet",
-    description: "Leather wallet with ZM ID and bank cards",
-    category: "documents",
-    imageUrl: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&h=300&fit=crop",
-    route: "Chirundu - Lusaka",
-    postDate: new Date(Date.now() - 5 * 60 * 60 * 1000),
-    status: "claimed" as const,
-    rewardAmount: 300,
-    contactInfo: "Mike +260 955 789012",
-  },
-  {
-    id: "4",
-    title: "Gold Wedding Ring",
-    description: "Gold wedding ring with initials engraved inside",
-    category: "jewelry",
-    postDate: new Date(Date.now() - 12 * 60 * 60 * 1000),
-    status: "lost" as const,
-    rewardAmount: 1000,
-    contactInfo: "Grace +260 966 111222",
-  },
-  {
-    id: "5",
-    title: "Black Jacket",
-    description: "Formal black jacket, size medium, left on seat",
-    category: "clothing",
-    imageUrl: "https://images.unsplash.com/photo-1551028719-00167b16ebc5?w=400&h=300&fit=crop",
-    route: "Lusaka - Kabwe",
-    postDate: new Date(Date.now() - 4 * 60 * 60 * 1000),
-    status: "found" as const,
-    contactInfo: "David +260 978 333444",
-  },
-];
-
-export default function LostAndFound() {
-  const { isAuthenticated } = useAuth();
+const LostAndFound = () => {
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<"report" | "search">("search");
+  const [formData, setFormData] = useState({
+    item_name: "",
+    category: "",
+    description: "",
+    location: "",
+    date_lost: "",
+    contact_phone: "",
+    contact_email: ""
+  });
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [selectedStatus, setSelectedStatus] = useState<string>("all");
-  const [showPostForm, setShowPostForm] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [foundItems, setFoundItems] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   const categories = [
-    "all",
-    "baggage",
-    "documents",
-    "electronics",
-    "jewelry",
-    "clothing",
-    "other",
+    "Electronics",
+    "Clothing",
+    "Documents",
+    "Baggage/Luggage",
+    "Accessories",
+    "Other"
   ];
 
-  const statuses = ["all", "lost", "found", "claimed"];
+  const handleReportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
 
-  const filteredItems = mockItems.filter((item) => {
-    const matchesSearch =
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === "all" || item.category === selectedCategory;
-    const matchesStatus = selectedStatus === "all" || item.status === selectedStatus;
+    try {
+      const reportData = {
+        item_name: formData.item_name,
+        category: formData.category,
+        description: formData.description,
+        location: formData.location,
+        date_lost: formData.date_lost,
+        contact_phone: formData.contact_phone,
+        contact_email: formData.contact_email,
+        user_id: user?.id || null,
+        status: 'lost'
+      };
 
-    return matchesSearch && matchesCategory && matchesStatus;
-  });
+      const { error } = await supabase
+        .from('lost_and_found')
+        .insert(reportData);
 
-  const handleClaim = (itemId: string) => {
-    if (!isAuthenticated) {
-      alert("Please sign in to claim items");
-      return;
+      if (error) {
+        if (error.code === '42P01' || error.message?.includes('does not exist')) {
+          toast.error("Database table not set up. Please run the lost and found migration in Supabase.");
+          return;
+        }
+        throw error;
+      }
+
+      toast.success("Lost item reported successfully! We'll help you find it.");
+      
+      setFormData({
+        item_name: "",
+        category: "",
+        description: "",
+        location: "",
+        date_lost: "",
+        contact_phone: "",
+        contact_email: ""
+      });
+    } catch (error) {
+      console.error('Error reporting lost item:', error);
+      toast.error("Failed to report lost item. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
-    alert(`Claim request sent for item ${itemId}. You'll be notified when the owner responds.`);
   };
 
-  const handleContact = (itemId: string) => {
-    if (!isAuthenticated) {
-      alert("Please sign in to contact owners");
-      return;
-    }
-    alert(`Opening contact form for item ${itemId}`);
-  };
+  const handleSearch = async () => {
+    setIsSearching(true);
+    try {
+      let query = supabase
+        .from('lost_and_found')
+        .select('*')
+        .eq('status', 'found');
 
-  const handlePostItem = () => {
-    if (!isAuthenticated) {
-      alert("Please sign in to post items");
-      return;
+      if (searchQuery) {
+        query = query.or(`item_name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%,category.ilike.%${searchQuery}%`);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        if (error.code === '42P01' || error.message?.includes('does not exist')) {
+          toast.error("Database table not set up. Please run the lost and found migration in Supabase.");
+          setFoundItems([]);
+          return;
+        }
+        throw error;
+      }
+
+      setFoundItems(data || []);
+    } catch (error) {
+      console.error('Error searching found items:', error);
+      toast.error("Failed to search. Please try again.");
+      setFoundItems([]);
+    } finally {
+      setIsSearching(false);
     }
-    setShowPostForm(true);
   };
 
   return (
     <div className="min-h-screen bg-gray-50 pb-16 md:pb-0">
       <Header />
-
-      {/* Hero Section */}
-      <section className="bg-white border-b border-gray-200 px-4 py-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <Heart className="h-6 w-6 text-green-600" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Lost & Found</h1>
-              <p className="text-gray-600">Report lost items or help reunite belongings with their owners</p>
-            </div>
-          </div>
-
-          <div className="flex gap-3">
-            <Button
-              onClick={handlePostItem}
-              className="bg-green-600 hover:bg-green-700"
-              size="lg"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Post Item
-            </Button>
-            <Button variant="outline" size="lg">
-              View My Posts
-            </Button>
-          </div>
+      
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        {/* Page Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Lost & Found</h1>
+          <p className="text-gray-600">Report lost items or search for found items</p>
         </div>
-      </section>
 
-      {/* Search & Filter Section */}
-      <section className="bg-white border-b border-gray-200 px-4 py-6 sticky top-14 md:top-0 z-30">
-        <div className="max-w-7xl mx-auto">
-          {/* Search Bar */}
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search items, routes, descriptions..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-          </div>
-
-          {/* Category Filter */}
-          <div className="mb-4">
-            <label className="block text-xs font-semibold text-gray-700 mb-2">
-              Category
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {categories.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                    selectedCategory === cat
-                      ? "bg-green-600 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Status Filter */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-2">
-              Status
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {statuses.map((status) => (
-                <button
-                  key={status}
-                  onClick={() => setSelectedStatus(status)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                    selectedStatus === status
-                      ? "bg-green-600 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  {status.charAt(0).toUpperCase() + status.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
+        {/* Tab Navigation */}
+        <div className="flex gap-2 mb-6">
+          <Button
+            variant={activeTab === "search" ? "default" : "outline"}
+            onClick={() => setActiveTab("search")}
+            className="flex-1"
+          >
+            <Search className="h-4 w-4 mr-2" />
+            Search Found Items
+          </Button>
+          <Button
+            variant={activeTab === "report" ? "default" : "outline"}
+            onClick={() => setActiveTab("report")}
+            className="flex-1"
+          >
+            <Package className="h-4 w-4 mr-2" />
+            Report Lost Item
+          </Button>
         </div>
-      </section>
 
-      {/* Items Grid */}
-      <section className="px-4 py-8">
-        <div className="max-w-7xl mx-auto">
-          {filteredItems.length === 0 ? (
-            <Card className="modern-card text-center py-12">
-              <CardContent>
-                <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  No items found
-                </h3>
-                <p className="text-gray-600">
-                  Try adjusting your search or filters
-                </p>
+        {activeTab === "search" && (
+          <div className="space-y-4">
+            {/* Search Box */}
+            <Card className="border-0 shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Search by item name, category, or description..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={handleSearch}
+                    disabled={isSearching}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Search className="h-4 w-4 mr-2" />
+                    {isSearching ? "Searching..." : "Search"}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
-          ) : (
-            <>
-              <div className="mb-4">
-                <p className="text-sm text-gray-600">
-                  Found <span className="font-semibold">{filteredItems.length}</span> item{filteredItems.length !== 1 ? "s" : ""}
-                </p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredItems.map((item) => (
-                  <LostItemCard
-                    key={item.id}
-                    item={item}
-                    onClaim={handleClaim}
-                    onContact={handleContact}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      </section>
 
-      {/* Post Item Form Modal */}
-      {showPostForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <Card className="modern-card w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <CardHeader>
-              <CardTitle>Post a Lost or Found Item</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-gray-600 text-sm">Form coming soon - connect to database to enable item posting</p>
-              <Button
-                variant="outline"
-                onClick={() => setShowPostForm(false)}
-                className="w-full"
-              >
-                Close
-              </Button>
+            {/* Found Items List */}
+            <div className="space-y-3">
+              {foundItems.length === 0 ? (
+                <Card className="border-0 shadow-sm">
+                  <CardContent className="p-6 text-center">
+                    <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-gray-600">
+                      {searchQuery ? "No found items match your search." : "Enter a search term to find items."}
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                foundItems.map((item) => (
+                  <Card key={item.id} className="border-0 shadow-sm">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="bg-green-100 p-2 rounded-lg">
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-gray-900 mb-1">{item.item_name}</h3>
+                          <p className="text-sm text-gray-600 mb-2">{item.description}</p>
+                          <div className="flex flex-wrap gap-3 text-xs text-gray-500">
+                            <span className="flex items-center gap-1">
+                              <Package className="h-3 w-3" />
+                              {item.category}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {item.location}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {new Date(item.date_found || item.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <div className="mt-3 pt-3 border-t border-gray-100 flex gap-2">
+                            <Button size="sm" variant="outline" className="text-xs">
+                              <Phone className="h-3 w-3 mr-1" />
+                              Contact
+                            </Button>
+                            <Button size="sm" variant="outline" className="text-xs">
+                              <Mail className="h-3 w-3 mr-1" />
+                              Email
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "report" && (
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-4">
+              <form onSubmit={handleReportSubmit} className="space-y-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
+                  <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-blue-800">
+                    Fill in the details below to report your lost item. We'll help you locate it.
+                  </p>
+                </div>
+
+                <Input
+                  placeholder="Item name (e.g., Black Backpack)"
+                  required
+                  className="h-10"
+                  value={formData.item_name}
+                  onChange={(e) => setFormData({ ...formData, item_name: e.target.value })}
+                />
+
+                <Select
+                  required
+                  value={formData.category}
+                  onValueChange={(value) => setFormData({ ...formData, category: value })}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Textarea
+                  placeholder="Describe the item (color, size, distinctive features...)"
+                  rows={3}
+                  required
+                  className="resize-none"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                />
+
+                <Input
+                  placeholder="Location where item was lost (e.g., Lusaka Station)"
+                  required
+                  className="h-10"
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                />
+
+                <Input
+                  type="date"
+                  required
+                  className="h-10"
+                  value={formData.date_lost}
+                  onChange={(e) => setFormData({ ...formData, date_lost: e.target.value })}
+                />
+
+                <Input
+                  type="tel"
+                  placeholder="Contact phone number"
+                  required
+                  className="h-10"
+                  value={formData.contact_phone}
+                  onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
+                />
+
+                <Input
+                  type="email"
+                  placeholder="Contact email"
+                  required
+                  className="h-10"
+                  value={formData.contact_email}
+                  onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
+                />
+
+                <Button
+                  type="submit"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white h-10"
+                  disabled={isSubmitting}
+                >
+                  <Package className="h-4 w-4 mr-2" />
+                  {isSubmitting ? "Submitting..." : "Report Lost Item"}
+                </Button>
+              </form>
             </CardContent>
           </Card>
-        </div>
-      )}
-
+        )}
+      </div>
       <BottomNav />
     </div>
   );
-}
+};
+
+export default LostAndFound;

@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { useRef } from "react";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
-import jsPDF from "jspdf";
 
 interface QRCodeDisplayProps {
   qrData: string;
@@ -25,14 +24,12 @@ const QRCodeDisplay = ({ qrData, bookingRef, bookingData }: QRCodeDisplayProps) 
 
   const handleDownloadQR = async () => {
     try {
-      // Get the QR code SVG element
       const svgElement = qrRef.current?.querySelector('svg');
       if (!svgElement) {
         toast.error('QR code not found');
         return;
       }
 
-      // Convert SVG to image
       const svgData = new XMLSerializer().serializeToString(svgElement);
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
@@ -66,173 +63,7 @@ const QRCodeDisplay = ({ qrData, bookingRef, bookingData }: QRCodeDisplayProps) 
   };
 
   const handleDownloadTicket = () => {
-    try {
-      toast.info('Generating PDF...');
-      
-      // Get QR code as image first
-      const svgElement = qrRef.current?.querySelector('svg');
-      if (!svgElement) {
-        toast.error('QR code not found');
-        return;
-      }
-
-      const svgData = new XMLSerializer().serializeToString(svgElement);
-      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-      const svgUrl = URL.createObjectURL(svgBlob);
-
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      
-      img.onload = () => {
-        try {
-          const pdf = new jsPDF('p', 'mm', 'a4');
-          const pageWidth = pdf.internal.pageSize.getWidth();
-          const margin = 15;
-          let yPos = margin;
-
-          // Header
-          pdf.setFontSize(24);
-          pdf.setTextColor(30, 64, 175);
-          pdf.setFont('helvetica', 'bold');
-          pdf.text('ZamBus', pageWidth / 2, yPos, { align: 'center' });
-          yPos += 8;
-
-          pdf.setFontSize(10);
-          pdf.setTextColor(100, 100, 100);
-          pdf.setFont('helvetica', 'normal');
-          pdf.text('Zambian Bus Ticketing System', pageWidth / 2, yPos, { align: 'center' });
-          yPos += 15;
-
-          // Booking Reference
-          pdf.setFontSize(16);
-          pdf.setTextColor(30, 64, 175);
-          pdf.setFont('helvetica', 'bold');
-          pdf.text(`Booking Reference: ${bookingRef}`, pageWidth / 2, yPos, { align: 'center' });
-          yPos += 15;
-
-          // Ticket Information
-          pdf.setFontSize(10);
-          pdf.setTextColor(0, 0, 0);
-          pdf.setFont('helvetica', 'normal');
-
-          const infoItems = [
-            { label: 'From', value: bookingData?.origin || 'N/A' },
-            { label: 'To', value: bookingData?.destination || 'N/A' },
-            { label: 'Date', value: bookingData?.date || 'N/A' },
-            { label: 'Departure Time', value: bookingData?.time || 'N/A' },
-            { label: 'Passenger', value: bookingData?.passengerName || 'N/A' },
-            { label: 'Seat Number', value: bookingData?.seatNumber || 'N/A' },
-          ];
-
-          // Draw info boxes
-          const boxWidth = (pageWidth - margin * 2 - 10) / 2;
-          const boxHeight = 12;
-          let xPos = margin;
-
-          infoItems.forEach((item, index) => {
-            if (index > 0 && index % 2 === 0) {
-              xPos = margin;
-              yPos += boxHeight + 5;
-            }
-
-            // Box background
-            pdf.setFillColor(243, 244, 246);
-            pdf.rect(xPos, yPos - 8, boxWidth, boxHeight, 'F');
-
-            // Label
-            pdf.setFontSize(8);
-            pdf.setTextColor(107, 114, 128);
-            pdf.text(item.label, xPos + 3, yPos - 3);
-
-            // Value
-            pdf.setFontSize(10);
-            pdf.setFont('helvetica', 'bold');
-            pdf.setTextColor(0, 0, 0);
-            const valueText = pdf.splitTextToSize(item.value, boxWidth - 6);
-            pdf.text(valueText, xPos + 3, yPos + 3);
-
-            xPos += boxWidth + 10;
-          });
-
-          yPos += boxHeight + 10;
-
-          // Price
-          if (bookingData?.price) {
-            pdf.setFontSize(14);
-            pdf.setFont('helvetica', 'bold');
-            pdf.setTextColor(0, 0, 0);
-            pdf.text(`Total: K${bookingData.price}`, pageWidth / 2, yPos, { align: 'center' });
-            yPos += 15;
-          }
-
-          // QR Code Section
-          pdf.setFontSize(12);
-          pdf.setFont('helvetica', 'bold');
-          pdf.text('Verification QR Code', pageWidth / 2, yPos, { align: 'center' });
-          yPos += 10;
-
-          // Convert SVG to canvas then to image
-          const canvas = document.createElement('canvas');
-          canvas.width = 256;
-          canvas.height = 256;
-          const ctx = canvas.getContext('2d');
-          
-          if (ctx) {
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            
-            const imgData = canvas.toDataURL('image/png');
-            const qrSize = 50; // mm
-            const qrX = (pageWidth - qrSize) / 2;
-            const qrY = yPos;
-
-            // Add border around QR code
-            pdf.setDrawColor(30, 64, 175);
-            pdf.setLineWidth(0.5);
-            pdf.rect(qrX - 2, qrY - 2, qrSize + 4, qrSize + 4);
-
-            // Add QR code image
-            pdf.addImage(imgData, 'PNG', qrX, qrY, qrSize, qrSize);
-
-            yPos += qrSize + 12;
-
-            // Footer
-            pdf.setFontSize(8);
-            pdf.setFont('helvetica', 'normal');
-            pdf.setTextColor(107, 114, 128);
-            pdf.text('Scan this QR code at boarding for verification', pageWidth / 2, yPos, { align: 'center' });
-            yPos += 6;
-
-            pdf.setFontSize(7);
-            pdf.text('Important: Please arrive 30 minutes before departure time.', pageWidth / 2, yPos, { align: 'center' });
-            yPos += 4;
-            pdf.text('Bring a valid ID for verification. Keep this ticket safe.', pageWidth / 2, yPos, { align: 'center' });
-            yPos += 4;
-            pdf.text(`Generated on ${new Date().toLocaleString()}`, pageWidth / 2, yPos, { align: 'center' });
-
-            // Save PDF
-            pdf.save(`zambus-ticket-${bookingRef}.pdf`);
-            URL.revokeObjectURL(svgUrl);
-            toast.success('Ticket downloaded as PDF!');
-          }
-        } catch (error) {
-          console.error('Error generating PDF:', error);
-          toast.error('Failed to generate PDF');
-          URL.revokeObjectURL(svgUrl);
-        }
-      };
-
-      img.onerror = () => {
-        toast.error('Failed to load QR code image');
-        URL.revokeObjectURL(svgUrl);
-      };
-
-      img.src = svgUrl;
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      toast.error('Failed to generate PDF');
-    }
+    toast.info('PDF download is not available in this environment. Please use the QR download instead.');
   };
 
   return (

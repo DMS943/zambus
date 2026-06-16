@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { Calendar, MapPin, ArrowLeftRight, Clock } from "lucide-react";
+import { Calendar, MapPin, ArrowLeftRight, Clock, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -160,7 +160,7 @@ const RouteSearch = () => {
           onClick={handleSearch}
           disabled={!fromCity || !toCity || !departureDate}
         >
-          <span className="mr-1.5">🔍</span>
+          <Search className="h-4 w-4 mr-1.5" />
           Search Routes
         </Button>
       </CardContent>

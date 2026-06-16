@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useSeatAvailability } from "@/hooks/useSeatAvailability";
 import { useSchedule, useSchedules } from "@/hooks/useSchedules";
 import { formatZMW } from "@/utils/pricingUtils";
-import { Clock, MapPin, Calendar } from "lucide-react";
+import { Clock, MapPin, Calendar, Car } from "lucide-react";
 
 interface SeatSelectionProps {
   scheduleId?: string;
@@ -215,8 +215,9 @@ const SeatSelection = ({ scheduleId, bookingDate, from, to, onDateChange, onTime
           <CardContent>
             <div className="max-w-sm mx-auto">
               {/* Bus Front */}
-              <div className="mb-4 p-3 bg-gradient-to-r from-gray-200 to-gray-300 rounded-t-3xl text-center border-2 border-gray-400">
-                <p className="text-sm font-medium text-gray-700">🚗 Driver</p>
+              <div className="mb-4 p-3 bg-gradient-to-r from-gray-200 to-gray-300 rounded-t-3xl text-center border-2 border-gray-400 flex items-center justify-center gap-2">
+                <Car className="h-4 w-4 text-gray-700" />
+                <p className="text-sm font-medium text-gray-700">Driver</p>
               </div>
               
               {/* Bus Body */}

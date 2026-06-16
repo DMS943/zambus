@@ -1,579 +1,514 @@
-import { useState, useEffect } from "react";
-import { Package, MapPin, Clock, DollarSign, Plus, Search, CheckCircle, XCircle, AlertCircle, Star } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import Header from "@/components/Header";
-import BottomNav from "@/components/BottomNav";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
-import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import Header from '@/components/Header';
+import BottomNav from '@/components/BottomNav';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { MapPin, Clock, DollarSign, Package, Truck, CheckCircle, AlertCircle } from 'lucide-react';
+import { formatZMW } from '@/utils/pricingUtils';
+import { format } from 'date-fns';
 
-const PackageDelivery = () => {
-  const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"my-packages" | "browse">("my-packages");
-  const [showNewPackageDialog, setShowNewPackageDialog] = useState(false);
-  const [myPackages, setMyPackages] = useState<any[]>([]);
-  const [availablePackages, setAvailablePackages] = useState<any[]>([]);
-  const [selectedPackage, setSelectedPackage] = useState<any>(null);
-  const [offers, setOffers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+interface BusRoute {
+  id: string;
+  origin: string;
+  destination: string;
+  distance_km: number;
+}
 
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    category: "Documents",
-    size: "medium",
-    weight_kg: "",
-    pickup_city: "",
-    dropoff_city: "",
-    pickup_date: "",
-    preferred_time: "",
-    insurance_option: false,
-    recipient_name: "",
-    recipient_phone: "",
-    recipient_email: "",
-    special_instructions: ""
-  });
-
-  const categories = ["Documents", "Electronics", "Clothing", "Food", "Gifts", "Medicine", "Other"];
-  const sizes = ["small", "medium", "large", "extra_large"];
-  const priorities = ["standard", "express", "same_day"];
-  
-  const zambianCities = [
-    "Lusaka", "Kitwe", "Ndola", "Livingstone", "Kabwe", 
-    "Chingola", "Mufulira", "Luanshya", "Kasama", "Chipata",
-    "Mongu", "Solwezi", "Mbala", "Mansa", "Kaoma"
-  ];
-
-  const calculatePrice = (weight: number) => {
-    const baseFee = 20; // ZMW base fee
-    const perKgRate = 10; // ZMW per kg
-    const price = baseFee + (weight * perKgRate);
-    return price.toFixed(2);
+interface Schedule {
+  id: string;
+  route_id: string;
+  departure_time: string;
+  arrival_time: string;
+  price_zmw: number;
+  available_seats: number;
+  routes: BusRoute;
+  buses: {
+    license_plate: string;
+    bus_class: string;
+    operator: {
+      name: string;
+    };
   };
+}
 
-  useEffect(() => {
-    if (user) {
-      loadMyPackages();
-    }
-    loadAvailablePackages();
-  }, [user]);
+interface PeerDelivery {
+  id: string;
+  sender_name: string;
+  sender_phone: string;
+  recipient_name: string;
+  recipient_phone: string;
+  origin: string;
+  destination: string;
+  package_description: string;
+  package_weight_kg: number;
+  delivery_date: string;
+  schedule_id: string;
+  status: 'pending' | 'in_transit' | 'delivered' | 'cancelled';
+  price_zmw: number;
+  created_at: string;
+}
 
-  const loadMyPackages = async () => {
-    try {
+const PeerDelivery = () => {
+  const [activeTab, setActiveTab] = useState<'send' | 'track'>('send');
+  const [origin, setOrigin] = useState('');
+  const [destination, setDestination] = useState('');
+  const [senderName, setSenderName] = useState('');
+  const [senderPhone, setSenderPhone] = useState('');
+  const [recipientName, setRecipientName] = useState('');
+  const [recipientPhone, setRecipientPhone] = useState('');
+  const [packageDesc, setPackageDesc] = useState('');
+  const [packageWeight, setPackageWeight] = useState('');
+  const [deliveryDate, setDeliveryDate] = useState('');
+  const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  // Fetch available schedules based on origin and destination
+  const { data: schedules = [], isLoading: schedulesLoading } = useQuery({
+    queryKey: ['schedules', origin, destination, deliveryDate],
+    queryFn: async () => {
+      if (!origin || !destination || !deliveryDate) return [];
+      
       const { data, error } = await supabase
-        .from('packages' as any)
-        .select('*')
-        .eq('sender_id', user?.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setMyPackages(data || []);
-    } catch (error) {
-      console.error('Error loading packages:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadAvailablePackages = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('packages' as any)
-        .select('*')
-        .in('status', ['pending', 'offered'])
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setAvailablePackages(data || []);
-    } catch (error) {
-      console.error('Error loading available packages:', error);
-    }
-  };
-
-  const loadOffers = async (packageId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('delivery_offers' as any)
+        .from('schedules')
         .select(`
-          *,
-          carrier:carrier_id(id, email, profiles(first_name, last_name))
+          id,
+          route_id,
+          departure_time,
+          arrival_time,
+          price_zmw,
+          available_seats,
+          routes (
+            id,
+            origin,
+            destination,
+            distance_km
+          ),
+          buses (
+            license_plate,
+            bus_class,
+            operator:operators(name)
+          )
         `)
-        .eq('package_id', packageId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setOffers(data || []);
-    } catch (error) {
-      console.error('Error loading offers:', error);
-    }
-  };
-
-  const handleSubmitPackage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const weight = parseFloat(formData.weight_kg);
-    const calculatedPrice = parseFloat(calculatePrice(weight));
-    
-    try {
-      const packageData = {
-        sender_id: user?.id,
-        title: formData.title,
-        description: formData.description,
-        category: formData.category,
-        size: formData.size,
-        weight_kg: weight,
-        pickup_city: formData.pickup_city,
-        dropoff_city: formData.dropoff_city,
-        pickup_date: formData.pickup_date,
-        preferred_time: formData.preferred_time || null,
-        offered_price: calculatedPrice,
-        insurance_option: formData.insurance_option,
-        insurance_cost: formData.insurance_option ? calculatedPrice * 0.1 : null,
-        recipient_name: formData.recipient_name,
-        recipient_phone: formData.recipient_phone,
-        recipient_email: formData.recipient_email || null,
-        special_instructions: formData.special_instructions || null
-      };
-
-      const { error } = await supabase
-        .from('packages' as any)
-        .insert(packageData);
+        .eq('routes.origin', origin)
+        .eq('routes.destination', destination)
+        .gte('departure_date', deliveryDate)
+        .lte('departure_date', deliveryDate)
+        .order('departure_time', { ascending: true });
 
       if (error) {
-        if (error.code === '42P01') {
-          toast.error("Database table not set up. Please run the package delivery migration.");
-          return;
-        }
-        throw error;
+        console.error('Error fetching schedules:', error);
+        return [];
       }
 
-      toast.success("Package listed successfully! Carriers can now make offers.");
-      setShowNewPackageDialog(false);
-      setFormData({
-        title: "",
-        description: "",
-        category: "Documents",
-        size: "medium",
-        weight_kg: "",
-        pickup_city: "",
-        dropoff_city: "",
-        pickup_date: "",
-        preferred_time: "",
-        insurance_option: false,
-        recipient_name: "",
-        recipient_phone: "",
-        recipient_email: "",
-        special_instructions: ""
-      });
-      loadMyPackages();
-    } catch (error) {
-      console.error('Error creating package:', error);
-      toast.error("Failed to list package. Please try again.");
-    }
+      return data || [];
+    },
+    enabled: !!(origin && destination && deliveryDate),
+  });
+
+  // Fetch user's deliveries (mock data for now)
+  const { data: deliveries = [] } = useQuery({
+    queryKey: ['deliveries'],
+    queryFn: async () => {
+      // Mock deliveries - in production this would fetch from Supabase
+      return [
+        {
+          id: '1',
+          sender_name: 'John Doe',
+          sender_phone: '260123456789',
+          recipient_name: 'Jane Smith',
+          recipient_phone: '260987654321',
+          origin: 'Lusaka',
+          destination: 'Kitwe',
+          package_description: 'Electronics - Laptop',
+          package_weight_kg: 2.5,
+          delivery_date: new Date().toISOString().split('T')[0],
+          schedule_id: 'sch-1',
+          status: 'in_transit' as const,
+          price_zmw: 50000,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: '2',
+          sender_name: 'Alice Johnson',
+          sender_phone: '260111222333',
+          recipient_name: 'Bob Wilson',
+          recipient_phone: '260444555666',
+          origin: 'Lusaka',
+          destination: 'Ndola',
+          package_description: 'Documents - Business Reports',
+          package_weight_kg: 0.5,
+          delivery_date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
+          schedule_id: 'sch-2',
+          status: 'delivered' as const,
+          price_zmw: 30000,
+          created_at: new Date(Date.now() - 86400000).toISOString(),
+        },
+      ];
+    },
+  });
+
+  const calculatePrice = () => {
+    if (!selectedSchedule || !packageWeight) return 0;
+    const basePrice = selectedSchedule.price_zmw;
+    const weightCharge = Math.ceil(parseFloat(packageWeight) * 5000); // 5000 per kg
+    return basePrice + weightCharge;
   };
 
-  const handleAcceptOffer = async (offerId: string, packageId: string, carrierId: string) => {
-    try {
-      // Update package status and assign carrier
-      const { error: packageError } = await supabase
-        .from('packages' as any)
-        .update({
-          status: 'accepted',
-          carrier_id: carrierId,
-          accepted_at: new Date().toISOString()
-        })
-        .eq('id', packageId);
-
-      if (packageError) throw packageError;
-
-      // Update offer status
-      const { error: offerError } = await supabase
-        .from('delivery_offers' as any)
-        .update({ status: 'accepted' })
-        .eq('id', offerId);
-
-      if (offerError) throw offerError;
-
-      // Reject other offers
-      const { error: rejectError } = await supabase
-        .from('delivery_offers' as any)
-        .update({ status: 'cancelled' })
-        .eq('package_id', packageId)
-        .neq('id', offerId);
-
-      if (rejectError) throw rejectError;
-
-      toast.success("Offer accepted! Carrier will pick up your package.");
-      loadMyPackages();
-      setOffers([]);
-    } catch (error) {
-      console.error('Error accepting offer:', error);
-      toast.error("Failed to accept offer. Please try again.");
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSchedule || !senderName || !recipientName || !packageDesc || !packageWeight) {
+      alert('Please fill all fields and select a schedule');
+      return;
     }
+    setSubmitted(true);
+    setTimeout(() => {
+      setSubmitted(false);
+      setOrigin('');
+      setDestination('');
+      setSenderName('');
+      setRecipientName('');
+      setPackageDesc('');
+      setPackageWeight('');
+      setDeliveryDate('');
+      setSelectedSchedule(null);
+    }, 3000);
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusBadge = (status: string) => {
+    const baseClasses = 'inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium';
     switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'offered': return 'bg-blue-100 text-blue-800';
-      case 'accepted': return 'bg-green-100 text-green-800';
-      case 'in_transit': return 'bg-purple-100 text-purple-800';
-      case 'delivered': return 'bg-emerald-100 text-emerald-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'pending': return <AlertCircle className="h-4 w-4" />;
-      case 'offered': return <Search className="h-4 w-4" />;
-      case 'accepted': return <CheckCircle className="h-4 w-4" />;
-      case 'in_transit': return <Package className="h-4 w-4" />;
-      case 'delivered': return <CheckCircle className="h-4 w-4" />;
-      case 'cancelled': return <XCircle className="h-4 w-4" />;
-      default: return <Package className="h-4 w-4" />;
+      case 'delivered':
+        return (
+          <span className={`${baseClasses} bg-green-100 text-green-700`}>
+            <CheckCircle className="h-3 w-3" />
+            Delivered
+          </span>
+        );
+      case 'in_transit':
+        return (
+          <span className={`${baseClasses} bg-blue-100 text-blue-700`}>
+            <Truck className="h-3 w-3" />
+            In Transit
+          </span>
+        );
+      case 'pending':
+        return (
+          <span className={`${baseClasses} bg-yellow-100 text-yellow-700`}>
+            <AlertCircle className="h-3 w-3" />
+            Pending
+          </span>
+        );
+      default:
+        return (
+          <span className={`${baseClasses} bg-gray-100 text-gray-700`}>
+            {status}
+          </span>
+        );
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50 pb-16 md:pb-0">
       <Header />
-      
       <div className="max-w-4xl mx-auto px-4 py-6">
-        {/* Page Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Package Delivery</h1>
-          <p className="text-gray-600">Send packages with travelers heading your way</p>
-        </div>
-
         {/* Tab Navigation */}
-        <div className="flex gap-2 mb-6">
-          <Button
-            variant={activeTab === "my-packages" ? "default" : "outline"}
-            onClick={() => setActiveTab("my-packages")}
-            className="flex-1"
+        <div className="flex gap-4 mb-6">
+          <button
+            onClick={() => setActiveTab('send')}
+            className={`pb-2 font-semibold border-b-2 transition-colors ${
+              activeTab === 'send'
+                ? 'border-accent text-accent'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+            }`}
           >
-            <Package className="h-4 w-4 mr-2" />
-            My Packages
-          </Button>
-          <Button
-            variant={activeTab === "browse" ? "default" : "outline"}
-            onClick={() => setActiveTab("browse")}
-            className="flex-1"
+            Send Package
+          </button>
+          <button
+            onClick={() => setActiveTab('track')}
+            className={`pb-2 font-semibold border-b-2 transition-colors ${
+              activeTab === 'track'
+                ? 'border-accent text-accent'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+            }`}
           >
-            <Search className="h-4 w-4 mr-2" />
-            Browse Packages
-          </Button>
+            Track Deliveries
+          </button>
         </div>
 
-        {activeTab === "my-packages" && (
-          <div className="space-y-4">
-            {/* New Package Button */}
-            <Dialog open={showNewPackageDialog} onOpenChange={setShowNewPackageDialog}>
-              <DialogTrigger asChild>
-                <Button className="w-full bg-blue-600 hover:bg-blue-700">
-                  <Plus className="h-4 w-4 mr-2" />
-                  List New Package
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>List a Package for Delivery</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmitPackage} className="space-y-4">
-                  <Input
-                    placeholder="Package title (e.g., Documents to Kitwe)"
-                    required
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  />
-                  <Textarea
-                    placeholder="Describe your package contents"
-                    rows={2}
-                    required
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  />
-                  <div className="grid grid-cols-2 gap-4">
-                    <Select
-                      required
-                      value={formData.category}
-                      onValueChange={(value) => setFormData({ ...formData, category: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((cat) => (
-                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      required
-                      value={formData.size}
-                      onValueChange={(value) => setFormData({ ...formData, size: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Size" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {sizes.map((size) => (
-                          <SelectItem key={size} value={size}>
-                            {size.charAt(0).toUpperCase() + size.slice(1)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    placeholder="Weight (kg)"
-                    required
-                    value={formData.weight_kg}
-                    onChange={(e) => setFormData({ ...formData, weight_kg: e.target.value })}
-                  />
-                  <div className="grid grid-cols-2 gap-4">
+        {/* Send Package Tab */}
+        {activeTab === 'send' && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Send a Package via Bus
+                </CardTitle>
+                <p className="text-sm text-gray-600 mt-2">
+                  Send packages safely using available bus routes. Your package travels with the bus and is delivered to your recipient.
+                </p>
+              </CardHeader>
+              <CardContent>
+                {submitted && (
+                  <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
                     <div>
-                      <label className="text-sm font-medium mb-1 block">Pickup City</label>
-                      <Select
-                        required
-                        value={formData.pickup_city}
-                        onValueChange={(value) => setFormData({ ...formData, pickup_city: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select city" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {zambianCities.map((city) => (
-                            <SelectItem key={city} value={city}>{city}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium mb-1 block">Dropoff City</label>
-                      <Select
-                        required
-                        value={formData.dropoff_city}
-                        onValueChange={(value) => setFormData({ ...formData, dropoff_city: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select city" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {zambianCities.map((city) => (
-                            <SelectItem key={city} value={city}>{city}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <p className="font-semibold text-green-900">Package Request Submitted!</p>
+                      <p className="text-sm text-green-800">Your delivery request has been received. The bus operator will contact you shortly.</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                )}
+
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  {/* Route Selection */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="origin" className="text-sm font-medium mb-2 block">From</Label>
+                      <Input
+                        id="origin"
+                        value={origin}
+                        onChange={(e) => setOrigin(e.target.value)}
+                        placeholder="e.g., Lusaka"
+                        className="h-10"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="destination" className="text-sm font-medium mb-2 block">To</Label>
+                      <Input
+                        id="destination"
+                        value={destination}
+                        onChange={(e) => setDestination(e.target.value)}
+                        placeholder="e.g., Kitwe"
+                        className="h-10"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Date Selection */}
+                  <div>
+                    <Label htmlFor="delivery-date" className="text-sm font-medium mb-2 block">Delivery Date</Label>
                     <Input
+                      id="delivery-date"
                       type="date"
-                      required
-                      value={formData.pickup_date}
-                      onChange={(e) => setFormData({ ...formData, pickup_date: e.target.value })}
-                    />
-                    <Input
-                      type="time"
-                      value={formData.preferred_time}
-                      onChange={(e) => setFormData({ ...formData, preferred_time: e.target.value })}
+                      value={deliveryDate}
+                      onChange={(e) => setDeliveryDate(e.target.value)}
+                      className="h-10"
+                      min={new Date().toISOString().split('T')[0]}
                     />
                   </div>
-                  {formData.weight_kg && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-blue-900">Calculated Price:</span>
-                        <span className="text-lg font-bold text-blue-600">
-                          ZMW {calculatePrice(parseFloat(formData.weight_kg) || 0)}
-                        </span>
+
+                  {/* Schedule Selection */}
+                  {origin && destination && deliveryDate && (
+                    <div>
+                      <Label className="text-sm font-medium mb-2 block">Select Bus Schedule</Label>
+                      {schedulesLoading && <p className="text-sm text-gray-600">Loading schedules...</p>}
+                      {!schedulesLoading && schedules.length === 0 && (
+                        <p className="text-sm text-gray-600">No schedules available for this route</p>
+                      )}
+                      <div className="space-y-2">
+                        {schedules.map((schedule) => (
+                          <div
+                            key={schedule.id}
+                            onClick={() => setSelectedSchedule(schedule)}
+                            className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                              selectedSchedule?.id === schedule.id
+                                ? 'border-accent bg-accent/5'
+                                : 'border-gray-200 hover:border-accent/50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-semibold text-gray-900">{schedule.buses?.operator?.name || 'Bus Operator'}</p>
+                                <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
+                                  <div className="flex items-center gap-1">
+                                    <Clock className="h-4 w-4" />
+                                    {schedule.departure_time}
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <MapPin className="h-4 w-4" />
+                                    {schedule.buses?.bus_class || 'Standard'}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-semibold text-gray-900">{formatZMW(schedule.price_zmw)}</p>
+                                <p className="text-xs text-gray-600">+ weight charge</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <p className="text-xs text-blue-700 mt-1">
-                        Base fee: ZMW 20 + ZMW 10 per kg
-                      </p>
                     </div>
                   )}
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="insurance"
-                      checked={formData.insurance_option}
-                      onChange={(e) => setFormData({ ...formData, insurance_option: e.target.checked })}
-                    />
-                    <label htmlFor="insurance" className="text-sm">
-                      Add insurance (10% of price)
-                    </label>
-                  </div>
-                  <div className="border-t pt-4">
-                    <p className="text-sm font-medium mb-3">Recipient Details</p>
-                    <div className="grid grid-cols-2 gap-4">
-                      <Input
-                        placeholder="Recipient name"
-                        required
-                        value={formData.recipient_name}
-                        onChange={(e) => setFormData({ ...formData, recipient_name: e.target.value })}
-                      />
-                      <Input
-                        type="tel"
-                        placeholder="Recipient phone"
-                        required
-                        value={formData.recipient_phone}
-                        onChange={(e) => setFormData({ ...formData, recipient_phone: e.target.value })}
-                      />
+
+                  {/* Sender Details */}
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-3">Sender Details</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="sender-name" className="text-sm font-medium mb-2 block">Your Name</Label>
+                        <Input
+                          id="sender-name"
+                          value={senderName}
+                          onChange={(e) => setSenderName(e.target.value)}
+                          placeholder="Full name"
+                          className="h-10"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="sender-phone" className="text-sm font-medium mb-2 block">Your Phone</Label>
+                        <Input
+                          id="sender-phone"
+                          value={senderPhone}
+                          onChange={(e) => setSenderPhone(e.target.value)}
+                          placeholder="+260 ..."
+                          className="h-10"
+                        />
+                      </div>
                     </div>
-                    <Input
-                      type="email"
-                      placeholder="Recipient email (optional)"
-                      className="mt-4"
-                      value={formData.recipient_email}
-                      onChange={(e) => setFormData({ ...formData, recipient_email: e.target.value })}
-                    />
                   </div>
-                  <Textarea
-                    placeholder="Special instructions (optional)"
-                    rows={2}
-                    value={formData.special_instructions}
-                    onChange={(e) => setFormData({ ...formData, special_instructions: e.target.value })}
-                  />
-                  <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-                    List Package
+
+                  {/* Recipient Details */}
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-3">Recipient Details</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="recipient-name" className="text-sm font-medium mb-2 block">Recipient Name</Label>
+                        <Input
+                          id="recipient-name"
+                          value={recipientName}
+                          onChange={(e) => setRecipientName(e.target.value)}
+                          placeholder="Full name"
+                          className="h-10"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="recipient-phone" className="text-sm font-medium mb-2 block">Recipient Phone</Label>
+                        <Input
+                          id="recipient-phone"
+                          value={recipientPhone}
+                          onChange={(e) => setRecipientPhone(e.target.value)}
+                          placeholder="+260 ..."
+                          className="h-10"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Package Details */}
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-3">Package Details</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="package-desc" className="text-sm font-medium mb-2 block">Package Description</Label>
+                        <Input
+                          id="package-desc"
+                          value={packageDesc}
+                          onChange={(e) => setPackageDesc(e.target.value)}
+                          placeholder="e.g., Electronics, Documents, Clothing"
+                          className="h-10"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="package-weight" className="text-sm font-medium mb-2 block">Weight (kg)</Label>
+                        <Input
+                          id="package-weight"
+                          type="number"
+                          value={packageWeight}
+                          onChange={(e) => setPackageWeight(e.target.value)}
+                          placeholder="0.5"
+                          min="0.1"
+                          step="0.1"
+                          className="h-10"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Price Summary */}
+                  {selectedSchedule && packageWeight && (
+                    <Card className="bg-accent/5 border-accent">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="h-5 w-5 text-accent" />
+                            <span className="text-sm font-medium text-gray-900">Total Price</span>
+                          </div>
+                          <span className="text-2xl font-bold text-accent">{formatZMW(calculatePrice())}</span>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-2">
+                          Base fare {formatZMW(selectedSchedule.price_zmw)} + Weight charge {formatZMW(Math.ceil(parseFloat(packageWeight) * 5000))}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  <Button
+                    type="submit"
+                    className="w-full bg-accent hover:bg-accent/90 text-white h-12 font-semibold"
+                    disabled={!selectedSchedule || !senderName || !recipientName || !packageDesc || !packageWeight}
+                  >
+                    Submit Delivery Request
                   </Button>
                 </form>
-              </DialogContent>
-            </Dialog>
-
-            {/* My Packages List */}
-            {loading ? (
-              <Card className="border-0 shadow-sm">
-                <CardContent className="p-6 text-center">
-                  <p className="text-gray-600">Loading your packages...</p>
-                </CardContent>
-              </Card>
-            ) : myPackages.length === 0 ? (
-              <Card className="border-0 shadow-sm">
-                <CardContent className="p-6 text-center">
-                  <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                  <p className="text-gray-600">No packages listed yet.</p>
-                  <p className="text-sm text-gray-500 mt-1">Click the button above to list your first package.</p>
-                </CardContent>
-              </Card>
-            ) : (
-              myPackages.map((pkg) => (
-                <Card key={pkg.id} className="border-0 shadow-sm">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{pkg.title}</h3>
-                        <p className="text-sm text-gray-600">{pkg.description}</p>
-                      </div>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(pkg.status)}`}>
-                        <div className="flex items-center gap-1">
-                          {getStatusIcon(pkg.status)}
-                          {pkg.status.replace('_', ' ')}
-                        </div>
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 text-sm text-gray-600 mb-3">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4" />
-                        <span>{pkg.pickup_city} → {pkg.dropoff_city}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        <span>{new Date(pkg.pickup_date).toLocaleDateString()}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4" />
-                        <span>ZMW {pkg.offered_price}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Package className="h-4 w-4" />
-                        <span>{pkg.size} • {pkg.weight_kg}kg</span>
-                      </div>
-                    </div>
-                    {pkg.tracking_number && (
-                      <div className="bg-gray-50 p-2 rounded text-sm mb-3">
-                        <span className="text-gray-600">Tracking: </span>
-                        <span className="font-mono font-medium">{pkg.tracking_number}</span>
-                      </div>
-                    )}
-                    {pkg.status === 'offered' && (
-                      <Button
-                        onClick={() => {
-                          setSelectedPackage(pkg);
-                          loadOffers(pkg.id);
-                        }}
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                      >
-                        View Offers ({offers.length})
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
-              ))
-            )}
+              </CardContent>
+            </Card>
           </div>
         )}
 
-        {activeTab === "browse" && (
+        {/* Track Deliveries Tab */}
+        {activeTab === 'track' && (
           <div className="space-y-4">
-            {availablePackages.length === 0 ? (
-              <Card className="border-0 shadow-sm">
-                <CardContent className="p-6 text-center">
-                  <Search className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                  <p className="text-gray-600">No packages available for delivery right now.</p>
-                  <p className="text-sm text-gray-500 mt-1">Check back later or list your own package.</p>
+            {deliveries.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">No Deliveries Yet</h3>
+                  <p className="text-gray-600">Start by sending your first package</p>
                 </CardContent>
               </Card>
             ) : (
-              availablePackages.map((pkg) => (
-                <Card key={pkg.id} className="border-0 shadow-sm">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-3">
+              deliveries.map((delivery) => (
+                <Card key={delivery.id}>
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between mb-4">
                       <div>
-                        <h3 className="font-semibold text-gray-900">{pkg.title}</h3>
-                        <p className="text-sm text-gray-600">{pkg.description}</p>
+                        <h3 className="font-semibold text-gray-900 text-lg">
+                          {delivery.origin} → {delivery.destination}
+                        </h3>
+                        <p className="text-sm text-gray-600 mt-1">{delivery.package_description}</p>
                       </div>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(pkg.status)}`}>
-                        {pkg.status.replace('_', ' ')}
-                      </span>
+                      {getStatusBadge(delivery.status)}
                     </div>
-                    <div className="grid grid-cols-2 gap-3 text-sm text-gray-600 mb-3">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4" />
-                        <span>{pkg.pickup_city} → {pkg.dropoff_city}</span>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 py-4 border-y border-gray-200">
+                      <div>
+                        <p className="text-xs text-gray-600 uppercase tracking-wide">Recipient</p>
+                        <p className="font-semibold text-gray-900 mt-1">{delivery.recipient_name}</p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        <span>{new Date(pkg.pickup_date).toLocaleDateString()}</span>
+                      <div>
+                        <p className="text-xs text-gray-600 uppercase tracking-wide">Weight</p>
+                        <p className="font-semibold text-gray-900 mt-1">{delivery.package_weight_kg} kg</p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4" />
-                        <span>ZMW {pkg.offered_price}</span>
+                      <div>
+                        <p className="text-xs text-gray-600 uppercase tracking-wide">Date</p>
+                        <p className="font-semibold text-gray-900 mt-1">
+                          {format(new Date(delivery.delivery_date), 'MMM dd, yyyy')}
+                        </p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Package className="h-4 w-4" />
-                        <span>{pkg.size} • {pkg.weight_kg}kg</span>
+                      <div>
+                        <p className="text-xs text-gray-600 uppercase tracking-wide">Cost</p>
+                        <p className="font-semibold text-gray-900 mt-1">{formatZMW(delivery.price_zmw)}</p>
                       </div>
                     </div>
-                    <Button
-                      onClick={() => window.location.href = `/carrier-opportunities`}
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                    >
-                      View as Carrier
+
+                    <Button variant="outline" className="w-full">
+                      View Details
                     </Button>
                   </CardContent>
                 </Card>
@@ -581,63 +516,10 @@ const PackageDelivery = () => {
             )}
           </div>
         )}
-
-        {/* Offers Dialog */}
-        {selectedPackage && (
-          <Dialog open={!!selectedPackage} onOpenChange={() => setSelectedPackage(null)}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Delivery Offers</DialogTitle>
-              </DialogHeader>
-              {offers.length === 0 ? (
-                <p className="text-gray-600 text-center py-4">No offers yet for this package.</p>
-              ) : (
-                <div className="space-y-3">
-                  {offers.map((offer) => (
-                    <Card key={offer.id} className="border-0 shadow-sm">
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <p className="font-semibold text-gray-900">
-                              {offer.carrier?.profiles?.first_name} {offer.carrier?.profiles?.last_name}
-                            </p>
-                            <p className="text-sm text-gray-600">{offer.carrier?.email}</p>
-                          </div>
-                          <span className="text-lg font-bold text-blue-600">
-                            ZMW {offer.offered_price}
-                          </span>
-                        </div>
-                        {offer.message && (
-                          <p className="text-sm text-gray-600 mb-3">{offer.message}</p>
-                        )}
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={() => handleAcceptOffer(offer.id, selectedPackage.id, offer.carrier_id)}
-                            size="sm"
-                            className="flex-1 bg-green-600 hover:bg-green-700"
-                          >
-                            Accept Offer
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex-1"
-                          >
-                            View Profile
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </DialogContent>
-          </Dialog>
-        )}
       </div>
       <BottomNav />
     </div>
   );
 };
 
-export default PackageDelivery;
+export default PeerDelivery;

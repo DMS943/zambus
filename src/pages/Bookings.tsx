@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import Header from '@/components/Header';
 import BottomNav from '@/components/BottomNav';
 import QRCodeDisplay from '@/components/QRCodeDisplay';
-import { CalendarIcon, MapPin, Users, Clock, Phone, Mail, ArrowRight, X } from 'lucide-react';
+import { CalendarIcon, MapPin, Users, Clock, Phone, Mail, ArrowRight, X, Luggage, Smartphone } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatZMW } from '@/utils/pricingUtils';
 import { Input } from '@/components/ui/input';
@@ -342,13 +342,13 @@ const Bookings = () => {
                       </div>
                       {(booking.baggage_weight_kg && booking.baggage_weight_kg > 0) && (
                         <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <span className="text-xs">🛄</span>
+                          <Luggage className="h-4 w-4 text-gray-500" />
                           <span>Baggage: {booking.baggage_weight_kg}kg</span>
                         </div>
                       )}
                       {(booking.extra_luggage_count && booking.extra_luggage_count > 0) && (
                         <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <span className="text-xs">🛄</span>
+                          <Luggage className="h-4 w-4 text-gray-500" />
                           <span>Extra bags: {booking.extra_luggage_count}</span>
                         </div>
                       )}
@@ -365,7 +365,7 @@ const Bookings = () => {
                             className="text-blue-600 border-blue-600 hover:bg-blue-50 text-xs px-3 py-1.5 h-8"
                             onClick={() => setSelectedBooking(booking)}
                           >
-                            <span className="mr-1">📱</span>
+                            <Smartphone className="h-3 w-3 mr-1" />
                             View Ticket
                           </Button>
                           <Button 

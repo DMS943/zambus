@@ -1,9 +1,7 @@
-
 import { useState, useEffect } from "react";
-import { Calendar, MapPin, ArrowLeftRight, Clock } from "lucide-react";
+import { Calendar, MapPin, ArrowLeftRight, Clock, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -13,24 +11,20 @@ const RouteSearch = () => {
   const [fromCity, setFromCity] = useState("");
   const [toCity, setToCity] = useState("");
   const [departureDate, setDepartureDate] = useState("");
-  const [passengers, setPassengers] = useState("1");
-  // Store an exact time value in HH:MM format (HTML time input)
   const [departureTime, setDepartureTime] = useState<string>("");
 
   const zambianCities = [
-    "Lusaka", "Kitwe", "Ndola", "Kabwe", "Chingola", "Mufulira", 
+    "Lusaka", "Kitwe", "Ndola", "Kabwe", "Chingola", "Mufulira",
     "Livingstone", "Luanshya", "Kasama", "Chipata", "Mongu", "Solwezi",
     "Mazabuka", "Choma", "Kafue", "Mumbwa", "Kapiri Mposhi", "Kaoma",
     "Sesheke", "Mpika", "Mbala", "Nakonde", "Lundazi", "Petauke",
     "Mwinilunga", "Kansanshi", "Kasumbalesa", "Kazungula"
   ];
 
-  // Pre-fill form if coming from routes page
   useEffect(() => {
     const fromParam = searchParams.get("from");
     const toParam = searchParams.get("to");
     const timeParam = searchParams.get("time");
-    
     if (fromParam) setFromCity(fromParam);
     if (toParam) setToCity(toParam);
     if (timeParam) setDepartureTime(timeParam);
@@ -43,128 +37,106 @@ const RouteSearch = () => {
   };
 
   const handleSearch = (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
+    if (e) { e.preventDefault(); e.stopPropagation(); }
     if (fromCity && toCity && departureDate) {
-      const params = new URLSearchParams({
-        step: "results",
-        from: fromCity,
-        to: toCity,
-        date: departureDate,
-      });
-      if (departureTime) {
-        params.append("time", departureTime);
-      }
+      const params = new URLSearchParams({ step: "results", from: fromCity, to: toCity, date: departureDate });
+      if (departureTime) params.append("time", departureTime);
       navigate(`/?${params.toString()}`, { replace: false });
     }
   };
 
   return (
-    <Card className="w-full shadow-sm border-0">
-      <CardContent className="p-3">
-        <div className="space-y-2.5">
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-gray-700">From (Origin)</label>
-            <Select value={fromCity} onValueChange={setFromCity}>
-              <SelectTrigger className="h-9 border-gray-300 text-sm">
-                <div className="flex items-center">
-                  <MapPin className="h-3.5 w-3.5 mr-2 text-gray-400" />
-                  <SelectValue placeholder="Select city" />
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                {zambianCities.map((city) => (
-                  <SelectItem key={city} value={city}>
-                    {city}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex justify-center -my-0.5">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={handleSwapCities}
-            >
-              <ArrowLeftRight className="h-3.5 w-3.5 text-gray-400" />
-            </Button>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-gray-700">To (Destination)</label>
-            <Select value={toCity} onValueChange={setToCity}>
-              <SelectTrigger className="h-9 border-gray-300 text-sm">
-                <div className="flex items-center">
-                  <MapPin className="h-3.5 w-3.5 mr-2 text-gray-400" />
-                  <SelectValue placeholder="Select city" />
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                {zambianCities.map((city) => (
-                  <SelectItem key={city} value={city}>
-                    {city}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2.5">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-gray-700">Date</label>
-              <div className="relative">
-                <Calendar className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
-                <Input
-                  type="date"
-                  value={departureDate}
-                  onChange={(e) => {
-                    const selectedDate = e.target.value;
-                    const today = new Date().toISOString().split('T')[0];
-                    
-                    // Prevent selecting past dates
-                    if (selectedDate < today) {
-                      return;
-                    }
-                    
-                    setDepartureDate(selectedDate);
-                  }}
-                  className="h-9 pl-9 border-gray-300 text-sm"
-                  min={new Date().toISOString().split('T')[0]}
-                />
-              </div>
+    <div className="w-full space-y-3">
+      {/* From city */}
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-gray-600">From</label>
+        <Select value={fromCity} onValueChange={setFromCity}>
+          <SelectTrigger className="h-10 border-gray-200 bg-gray-50 text-sm">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+              <SelectValue placeholder="Select origin city" />
             </div>
+          </SelectTrigger>
+          <SelectContent>
+            {zambianCities.map((city) => (
+              <SelectItem key={city} value={city}>{city}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-gray-700">Time</label>
-              <div className="relative">
-                <Clock className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
-                <Input
-                  type="time"
-                  value={departureTime}
-                  onChange={(e) => setDepartureTime(e.target.value)}
-                  className="h-9 pl-9 border-gray-300 text-sm"
-                />
-              </div>
+      {/* Swap button */}
+      <div className="flex justify-center -my-1">
+        <button
+          type="button"
+          onClick={handleSwapCities}
+          className="h-7 w-7 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center hover:bg-blue-100 transition-colors"
+        >
+          <ArrowLeftRight className="h-3.5 w-3.5 text-blue-500" />
+        </button>
+      </div>
+
+      {/* To city */}
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-gray-600">To</label>
+        <Select value={toCity} onValueChange={setToCity}>
+          <SelectTrigger className="h-10 border-gray-200 bg-gray-50 text-sm">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-3.5 w-3.5 text-red-400 flex-shrink-0" />
+              <SelectValue placeholder="Select destination city" />
             </div>
+          </SelectTrigger>
+          <SelectContent>
+            {zambianCities.map((city) => (
+              <SelectItem key={city} value={city}>{city}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Date & Time */}
+      <div className="grid grid-cols-2 gap-2.5">
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-gray-600">Date</label>
+          <div className="relative">
+            <Calendar className="absolute left-2.5 top-3 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
+            <Input
+              type="date"
+              value={departureDate}
+              onChange={(e) => {
+                const val = e.target.value;
+                const today = new Date().toISOString().split('T')[0];
+                if (val >= today) setDepartureDate(val);
+              }}
+              className="h-10 pl-8 border-gray-200 bg-gray-50 text-sm"
+              min={new Date().toISOString().split('T')[0]}
+            />
           </div>
         </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-gray-600">Time (optional)</label>
+          <div className="relative">
+            <Clock className="absolute left-2.5 top-3 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
+            <Input
+              type="time"
+              value={departureTime}
+              onChange={(e) => setDepartureTime(e.target.value)}
+              className="h-10 pl-8 border-gray-200 bg-gray-50 text-sm"
+            />
+          </div>
+        </div>
+      </div>
 
-        <Button 
-          type="button"
-          className="w-full mt-3 h-9 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm"
-          onClick={handleSearch}
-          disabled={!fromCity || !toCity || !departureDate}
-        >
-          <span className="mr-1.5">🔍</span>
-          Search Routes
-        </Button>
-      </CardContent>
-    </Card>
+      <Button
+        type="button"
+        className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl shadow-sm"
+        onClick={handleSearch}
+        disabled={!fromCity || !toCity || !departureDate}
+      >
+        <Search className="h-4 w-4 mr-2" />
+        Search Buses
+      </Button>
+    </div>
   );
 };
 

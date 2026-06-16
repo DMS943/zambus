@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Download, Share, Home } from "lucide-react";
+import { CheckCircle, Download, Share, Home, Luggage } from "lucide-react";
 import QRCodeDisplay from "@/components/QRCodeDisplay";
 import { generateQRData } from "@/utils/qrUtils";
 import { toast } from "@/hooks/use-toast";
@@ -199,13 +199,15 @@ const BookingConfirmation = ({
                     ))}
                   </div>
                   {booking?.baggage_weight_kg && booking.baggage_weight_kg > 0 && (
-                    <div className="mt-2 text-sm text-gray-600">
-                      🛄 Total Baggage: {booking.baggage_weight_kg}kg
+                    <div className="mt-2 text-sm text-gray-600 flex items-center gap-1.5">
+                      <Luggage className="h-4 w-4 text-gray-500" />
+                      Total Baggage: {booking.baggage_weight_kg}kg
                     </div>
                   )}
                   {booking?.extra_luggage_count && booking.extra_luggage_count > 0 && (
-                    <div className="mt-2 text-sm text-gray-600">
-                      🛄 Extra Bags: {booking.extra_luggage_count}
+                    <div className="mt-2 text-sm text-gray-600 flex items-center gap-1.5">
+                      <Luggage className="h-4 w-4 text-gray-500" />
+                      Extra Bags: {booking.extra_luggage_count}
                     </div>
                   )}
                 </div>

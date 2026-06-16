@@ -216,7 +216,7 @@ const SeatSelection = ({ scheduleId, bookingDate, from, to, onDateChange, onTime
             <div className="max-w-sm mx-auto">
               {/* Bus Front */}
               <div className="mb-4 p-3 bg-gradient-to-r from-gray-200 to-gray-300 rounded-t-3xl text-center border-2 border-gray-400">
-                <p className="text-sm font-medium text-gray-700">🚗 Driver</p>
+                <p className="text-sm font-medium text-gray-700">Driver</p>
               </div>
               
               {/* Bus Body */}

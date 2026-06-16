@@ -195,7 +195,7 @@ const Index = () => {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white font-bold text-sm border border-white/30 flex-shrink-0">
-                      {isAuthenticated && user ? (user.firstName?.[0] || user.email?.[0] || "U").toUpperCase() : "👋"}
+                      {isAuthenticated && user ? (user.firstName?.[0] || user.email?.[0] || "U").toUpperCase() : "G"}
                     </div>
                     <div>
                       <p className="text-blue-200 text-xs">{t('index.welcome')}</p>
